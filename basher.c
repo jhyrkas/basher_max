@@ -213,8 +213,8 @@ static void *basher_new(t_symbol *s, int argc, t_atom *argv)
     int mem_size = MAXFREQS*sizeof(as_pair);
     memset(x->workspace, 0, mem_size);
 
-    x->bash_out = outlet_new((t_object *)x, 0); // add outlet
-    x->amp_out = outlet_new((t_object *)x, 0); // add outlet
+    x->amp_out = listout((t_object *)x); // add outlet
+    x->bash_out = listout((t_object *)x); // add outlet
 
     // defaults
     x->bash_on = 1;
