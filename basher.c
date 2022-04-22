@@ -46,8 +46,9 @@ typedef struct _basher
 
 t_symbol *ps_list; // needed for list output? based on thresh.c example in max-sdk
 
-void set_bash_on(t_basher *x, double f) {
-    x->bash_on = f > 0 ? 1 : 0;
+void set_bash_on(t_basher *x, int t) {
+    object_post(x, "received %d", t);
+    x->bash_on = t > 0 ? 1 : 0;
 }
 
 // set the threshold min
@@ -104,8 +105,7 @@ void bash_freqs(t_basher *x, t_symbol *s, long argc, t_atom *argv) {
         x->workspace[i].bashed_amp = x->workspace[i].amplitude;
     }
 
-    // sorting and conditionals seems like this couldn't be at audio rate without a lot of thinking...
-
+    object_post(x, "bash on: %d", x->bash_on, 0);
 
     // slow but thorough bashing: start by merging the smallest difference in range and then continue until no more are found
     if (x->bash_on) {
@@ -114,6 +114,7 @@ void bash_freqs(t_basher *x, t_symbol *s, long argc, t_atom *argv) {
         while (search && iters < 100) {
 //          while(search) {
             // sort by frequency
+            // sorting and conditionals seems like this couldn't be at audio rate without a lot of thinking...
             qsort(x->workspace, limit, sizeof(as_pair), pair_compar);
 
             // in the special case where frequencies are fully fused, we need to 
@@ -163,6 +164,7 @@ void bash_freqs(t_basher *x, t_symbol *s, long argc, t_atom *argv) {
 
             // bashing the difference if it there is one eligible
             if (min_diff_cur <= x->max_diff && min_diff_cur >= x->min_diff) {
+                object_post(x, "BASHING",0);
                 float h_freq = x->workspace[index_h].frequency;
                 float l_freq = x->workspace[index_l].frequency;
                 float diff = h_freq - l_freq;
@@ -209,8 +211,8 @@ static void *basher_new(t_symbol *s, int argc, t_atom *argv)
     floatin(x,2); // min inlet
     intin(x,1); // toggle
 
-    //int mem_size = MAXFREQS*sizeof(as_pair);
-    //memset(x->workspace, 0, mem_size);
+    int mem_size = MAXFREQS*sizeof(as_pair);
+    memset(x->workspace, 0, mem_size);
 
     x->amp_out = listout((t_object *)x); // add outlet
     x->bash_out = listout((t_object *)x); // add outlet
@@ -259,7 +261,7 @@ void ext_main(void* r)
             0 // default value
     );
     class_addmethod(basher_class, (method)bash_freqs, "list", A_GIMME, 0);
-    class_addmethod(basher_class, (method)set_bash_on, "ft1", A_LONG, 0);
+    class_addmethod(basher_class, (method)set_bash_on, "in1", A_LONG, 0);
     class_addmethod(basher_class, (method)set_min, "ft2", A_FLOAT, 0);
     class_addmethod(basher_class, (method)set_max, "ft3", A_FLOAT, 0);
     class_addmethod(basher_class, (method)set_amt, "ft4", A_FLOAT, 0);
