@@ -53,7 +53,7 @@ void set_bash_on(t_basher *x, float f) {
 // set the threshold min
 void set_min(t_basher *x, float f) {
     if (f <= 0) {
-        object_error((t_object *)x, "max diff must be > 0 Hz; ignoring argument");
+        object_error((t_object *)x, "received %f: max diff must be > 0 Hz; ignoring argument", f);
         return;
     }
     x->min_diff = f; 
@@ -65,7 +65,7 @@ void set_min(t_basher *x, float f) {
 // set the threshold max
 void set_max(t_basher *x, float f) {
     if (f <= 0) {
-        object_error((t_object *)x, "max diff must be > 0 Hz; ignoring argument");
+        object_error((t_object *)x, "received %f: max diff must be > 0 Hz; ignoring argument", f);
         return;
     }
     x->max_diff = f; 
@@ -78,7 +78,7 @@ void set_max(t_basher *x, float f) {
 // set the bash amt
 void set_amt(t_basher *x, float f) { 
     if (f < 0) {
-        object_error((t_object *)x, "bash amt must be >= 0 Hz; ignoring argument");
+        object_error((t_object *)x, "received %f: bash amt must be >= 0 Hz; ignoring argument", f);
         return;
     }
     x->bash_amt = f;
@@ -88,8 +88,7 @@ void set_amt(t_basher *x, float f) {
 }
 
 // set the freqs
-void bash_freqs(t_basher *x, t_symbol *s, int argc, t_atom *argv) {
-/*
+void bash_freqs(t_basher *x, t_symbol *s, long argc, t_atom *argv) {
     // argv contains (f1, f2, f3....f_n, a1, a2, a3....a_n)
     int limit = argc/2 < MAXFREQS ? argc/2 : MAXFREQS;
 
@@ -184,7 +183,7 @@ void bash_freqs(t_basher *x, t_symbol *s, int argc, t_atom *argv) {
             iters++;
         }
         if (iters == 1000) {
-            post("maxed out iters");
+            post("maxed out iters",0);
         }
     }
 
@@ -197,16 +196,12 @@ void bash_freqs(t_basher *x, t_symbol *s, int argc, t_atom *argv) {
 
     outlet_list(x->bash_out, ps_list, limit, x->output_f);
     outlet_list(x->amp_out, ps_list, limit, x->output_a);
-*/
-    object_post(x, "got called");
 }
 
 // constructor
 static void *basher_new(t_symbol *s, int argc, t_atom *argv)
 {
-    post("new1",0);
     t_basher *x = (t_basher *)object_alloc(basher_class); // create new instance
-    post("new2",0);
 
     floatin(x,4); // bash amt
     floatin(x,3); // max inlet
@@ -224,6 +219,7 @@ static void *basher_new(t_symbol *s, int argc, t_atom *argv)
     x->min_diff = 10;
     x->max_diff = 30;
     x->bash_amt = 3;
+    post("argc %i", argc);
     // handling GIMME
     switch (argc) {
         default : // more than 3
@@ -251,7 +247,6 @@ static void *basher_new(t_symbol *s, int argc, t_atom *argv)
 
 void ext_main(void* r)
 {
-    post("main1",0);
     ps_list = gensym("list");
     basher_class = class_new(
             "basher", // class name
@@ -262,11 +257,10 @@ void ext_main(void* r)
             A_GIMME, // params
             0 // default value
     );
-    class_addmethod(basher_class, (method)bash_freqs, "bash", A_GIMME, 0);
-    class_addmethod(basher_class, (method)set_bash_on, "bash_on", A_FLOAT, 0);
-    class_addmethod(basher_class, (method)set_min, "min", A_FLOAT, 0);
-    class_addmethod(basher_class, (method)set_max, "max", A_FLOAT, 0);
-    class_addmethod(basher_class, (method)set_amt, "bash_amt", A_FLOAT, 0);
+    class_addmethod(basher_class, (method)bash_freqs, "list", A_GIMME, 0);
+    class_addmethod(basher_class, (method)set_bash_on, "ft1", A_LONG, 0);
+    class_addmethod(basher_class, (method)set_min, "ft2", A_FLOAT, 0);
+    class_addmethod(basher_class, (method)set_max, "ft3", A_FLOAT, 0);
+    class_addmethod(basher_class, (method)set_amt, "ft4", A_FLOAT, 0);
     class_register(CLASS_BOX, basher_class);
-    post("main2",0);
 }
