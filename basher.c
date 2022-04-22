@@ -46,14 +46,14 @@ typedef struct _basher
 
 t_symbol *ps_list; // needed for list output? based on thresh.c example in max-sdk
 
-void set_bash_on(t_basher *x, float f) {
+void set_bash_on(t_basher *x, double f) {
     x->bash_on = f > 0 ? 1 : 0;
 }
 
 // set the threshold min
-void set_min(t_basher *x, float f) {
+void set_min(t_basher *x, double f) {
     if (f <= 0) {
-        object_error((t_object *)x, "received %f: max diff must be > 0 Hz; ignoring argument", f);
+        object_error((t_object *)x, "received %f: min diff must be > 0 Hz; ignoring argument", f);
         return;
     }
     x->min_diff = f; 
@@ -63,7 +63,7 @@ void set_min(t_basher *x, float f) {
     }
 }
 // set the threshold max
-void set_max(t_basher *x, float f) {
+void set_max(t_basher *x, double f) {
     if (f <= 0) {
         object_error((t_object *)x, "received %f: max diff must be > 0 Hz; ignoring argument", f);
         return;
@@ -76,7 +76,7 @@ void set_max(t_basher *x, float f) {
 }
 
 // set the bash amt
-void set_amt(t_basher *x, float f) { 
+void set_amt(t_basher *x, double f) { 
     if (f < 0) {
         object_error((t_object *)x, "received %f: bash amt must be >= 0 Hz; ignoring argument", f);
         return;
@@ -89,6 +89,7 @@ void set_amt(t_basher *x, float f) {
 
 // set the freqs
 void bash_freqs(t_basher *x, t_symbol *s, long argc, t_atom *argv) {
+    post("argc: %d", argc, 0);
     // argv contains (f1, f2, f3....f_n, a1, a2, a3....a_n)
     int limit = argc/2 < MAXFREQS ? argc/2 : MAXFREQS;
 
