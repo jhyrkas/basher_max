@@ -47,7 +47,6 @@ typedef struct _basher
 t_symbol *ps_list; // needed for list output? based on thresh.c example in max-sdk
 
 void set_bash_on(t_basher *x, int t) {
-    object_post(x, "received %d", t);
     x->bash_on = t > 0 ? 1 : 0;
 }
 
@@ -90,7 +89,6 @@ void set_amt(t_basher *x, double f) {
 
 // set the freqs
 void bash_freqs(t_basher *x, t_symbol *s, long argc, t_atom *argv) {
-    post("argc: %d", argc, 0);
     // argv contains (f1, f2, f3....f_n, a1, a2, a3....a_n)
     int limit = argc/2 < MAXFREQS ? argc/2 : MAXFREQS;
 
@@ -104,8 +102,6 @@ void bash_freqs(t_basher *x, t_symbol *s, long argc, t_atom *argv) {
         x->workspace[i].amplitude = atom_getfloat(argv+limit+i);
         x->workspace[i].bashed_amp = x->workspace[i].amplitude;
     }
-
-    object_post(x, "bash on: %d", x->bash_on, 0);
 
     // slow but thorough bashing: start by merging the smallest difference in range and then continue until no more are found
     if (x->bash_on) {
@@ -164,7 +160,6 @@ void bash_freqs(t_basher *x, t_symbol *s, long argc, t_atom *argv) {
 
             // bashing the difference if it there is one eligible
             if (min_diff_cur <= x->max_diff && min_diff_cur >= x->min_diff) {
-                object_post(x, "BASHING",0);
                 float h_freq = x->workspace[index_h].frequency;
                 float l_freq = x->workspace[index_l].frequency;
                 float diff = h_freq - l_freq;
@@ -222,7 +217,6 @@ static void *basher_new(t_symbol *s, int argc, t_atom *argv)
     x->min_diff = 10;
     x->max_diff = 30;
     x->bash_amt = 3;
-    post("argc %i", argc);
     // handling GIMME
     switch (argc) {
         default : // more than 3
