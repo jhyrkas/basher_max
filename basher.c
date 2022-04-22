@@ -203,7 +203,9 @@ void bash_freqs(t_basher *x, t_symbol *s, int argc, t_atom *argv) {
 // constructor
 static void *basher_new(t_symbol *s, int argc, t_atom *argv)
 {
+    post("1",0);
     t_basher *x = (t_basher *)object_alloc(basher_class); // create new instance
+    post("2",0);
 
     floatin(x,4); // bash amt
     floatin(x,3); // max inlet
@@ -248,6 +250,7 @@ static void *basher_new(t_symbol *s, int argc, t_atom *argv)
 
 void ext_main(void* r)
 {
+    post("1",0);
     ps_list = gensym("list");
     basher_class = class_new(
             "basher", // class name
@@ -263,4 +266,5 @@ void ext_main(void* r)
     class_addmethod(basher_class, (method)set_min, "min", A_FLOAT, 0);
     class_addmethod(basher_class, (method)set_max, "max", A_FLOAT, 0);
     class_addmethod(basher_class, (method)set_amt, "bash_amt", A_FLOAT, 0);
+    class_register(CLASS_BOX, basher_class);
 }
