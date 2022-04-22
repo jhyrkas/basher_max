@@ -1,7 +1,7 @@
 #include "ext.h" // max
 #include "ext_obex.h" // max?
 #include <math.h> // TODO: needed?
-#include <stdlib.h> // malloc(), qsort()
+#include <stdlib.h> // qsort()
 #include <string.h> // memset()
 #ifdef NT
 #pragma warning( disable : 4244 )
@@ -40,13 +40,11 @@ typedef struct _basher
     float max_diff;               // max of threshold
     float bash_amt;               // freq in Hz to bash conflicting harmonic to (0 Hz = set to same freq, 1 Hz = set 1Hz apart, etc) 
     int bash_on;                    // bool: attach a toggle to get bashed or unbashed frequencies
-    t_outlet *bash_out;             // output for bashed frequencies
-    t_outlet *amp_out;              // output for amplitudes (right now it is just a pass through)
+    void *amp_out;              // output for amplitudes (right now it is just a pass through)
+    void *bash_out;             // output for bashed frequencies
 } t_basher;
 
 t_symbol *ps_list; // needed for list output? based on thresh.c example in max-sdk
-
-// NOTE: not really sure if this is the best behavior but oh well
 
 void set_bash_on(t_basher *x, float f) {
     x->bash_on = f > 0 ? 1 : 0;
@@ -91,6 +89,7 @@ void set_amt(t_basher *x, float f) {
 
 // set the freqs
 void bash_freqs(t_basher *x, t_symbol *s, int argc, t_atom *argv) {
+/*
     // argv contains (f1, f2, f3....f_n, a1, a2, a3....a_n)
     int limit = argc/2 < MAXFREQS ? argc/2 : MAXFREQS;
 
@@ -198,22 +197,24 @@ void bash_freqs(t_basher *x, t_symbol *s, int argc, t_atom *argv) {
 
     outlet_list(x->bash_out, ps_list, limit, x->output_f);
     outlet_list(x->amp_out, ps_list, limit, x->output_a);
+*/
+    object_post(x, "got called");
 }
 
 // constructor
 static void *basher_new(t_symbol *s, int argc, t_atom *argv)
 {
-    post("1",0);
+    post("new1",0);
     t_basher *x = (t_basher *)object_alloc(basher_class); // create new instance
-    post("2",0);
+    post("new2",0);
 
     floatin(x,4); // bash amt
     floatin(x,3); // max inlet
     floatin(x,2); // min inlet
     intin(x,1); // toggle
 
-    int mem_size = MAXFREQS*sizeof(as_pair);
-    memset(x->workspace, 0, mem_size);
+    //int mem_size = MAXFREQS*sizeof(as_pair);
+    //memset(x->workspace, 0, mem_size);
 
     x->amp_out = listout((t_object *)x); // add outlet
     x->bash_out = listout((t_object *)x); // add outlet
@@ -250,14 +251,14 @@ static void *basher_new(t_symbol *s, int argc, t_atom *argv)
 
 void ext_main(void* r)
 {
-    post("1",0);
+    post("main1",0);
     ps_list = gensym("list");
     basher_class = class_new(
             "basher", // class name
             (method)basher_new, // constructor
             (method)NULL, // destructor
     	    sizeof(t_basher), // class size in bytes
-            NULL, // graphical representation, depr
+            0L, // graphical representation, depr
             A_GIMME, // params
             0 // default value
     );
@@ -267,4 +268,5 @@ void ext_main(void* r)
     class_addmethod(basher_class, (method)set_max, "max", A_FLOAT, 0);
     class_addmethod(basher_class, (method)set_amt, "bash_amt", A_FLOAT, 0);
     class_register(CLASS_BOX, basher_class);
+    post("main2",0);
 }
