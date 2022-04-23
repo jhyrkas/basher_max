@@ -55,13 +55,13 @@ float get_curr_diss(t_spreader *x) {
             float scaler = 0.24f / (0.021f*min(x->workspace[i].frequency, x->workspace[j].frequency) + 19);
             float F = scaler * fabs(x->workspace[i].frequency - x->workspace[j].frequency);
             float diss_ = exp(-3.5f*F) - exp(-5.75*F);
-            diss += diss_;
+            diss += distance*diss_;
         }
     }
     return diss;
 }
 
-inline void send_output(t_spreader *x, int change) {
+void send_output(t_spreader *x, int change) {
     // output pan
     for (int i = 0; i < x->limit; i++) {
         int osc_index = x->workspace[i].osc_index; // this aligns the inputs and outputs in case of sorting
@@ -131,6 +131,7 @@ void opt_step(t_spreader *x) {
     x->workspace[index2].pan = oldpan1;
     float tmp_diss = get_curr_diss(x);
     float diss_diff = tmp_diss - x->curr_diss;
+
     int change = 0;
     // change for more consonance
     if (diss_diff < 0 && x->more_diss == 0) {
@@ -144,6 +145,8 @@ void opt_step(t_spreader *x) {
     if (change == 0) {
         x->workspace[index1].pan = oldpan1;
         x->workspace[index2].pan = oldpan2;
+    } else {
+        x->curr_diss = tmp_diss;
     }
 
     send_output(x, change);
