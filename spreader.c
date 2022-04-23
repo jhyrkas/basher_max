@@ -8,7 +8,7 @@
 #pragma warning( disable : 4305 )
 #endif
 #define MAXFREQS 128 // arbitrary global value for memory allocation
-#define max(a,b) a > b ? a : b
+#define min(a,b) a < b ? a : b
 
 // copied from old ext_mess.h...bad idea??
 #define SETFLOAT(ap, x) ((ap)->a_type = A_FLOAT, (ap)->a_w.w_float = (x))
@@ -47,18 +47,31 @@ void set_more_diss(t_spreader *x, int t) {
 }
 
 // function to compute current dissonance based on panning
-float get_curr_diss(t_spread *x) {
+float get_curr_diss(t_spreader *x) {
     float diss = 0.f;
     for (int i = 0; i < x->limit; i++) {
         for (int j = i+1; j < x->limit; j++) {
-            float distance = absf(x->workspace[i].pan - x->workspace[j].pan);
-            float scaler = 0.24f / (0.021f*minf(x->workspace[i].frequency, x->workspace[j].frequency) + 19);
-            float F = scaler * absf(x->workspace[i].frequency - x->workspace[j].frequency);
+            float distance = fabs(x->workspace[i].pan - x->workspace[j].pan);
+            float scaler = 0.24f / (0.021f*min(x->workspace[i].frequency, x->workspace[j].frequency) + 19);
+            float F = scaler * fabs(x->workspace[i].frequency - x->workspace[j].frequency);
             float diss_ = exp(-3.5f*F) - exp(-5.75*F);
             diss += diss_;
         }
     }
     return diss;
+}
+
+inline void send_output(t_spreader *x, int change) {
+    // output pan
+    for (int i = 0; i < x->limit; i++) {
+        int osc_index = x->workspace[i].osc_index; // this aligns the inputs and outputs in case of sorting
+        SETFLOAT(x->output_p+osc_index, x->workspace[i].pan);
+    }
+
+    outlet_list(x->pan_out, ps_list, x->limit, x->output_p);
+    if (change) {
+        outlet_bang(x->bang_out);
+    }
 }
 
 // this sets the frequencies and computes the current dissonance
@@ -92,22 +105,9 @@ void set_new_freqs(t_spreader *x, t_symbol *s, long argc, t_atom *argv) {
     send_output(x, 1);
 }
 
-inline void send_output(t_spreader *x, int change) {
-    // output pan
-    for (int i = 0; i < x->limit; i++) {
-        int osc_index = x->workspace[i].osc_index; // this aligns the inputs and outputs in case of sorting
-        SETFLOAT(x->output_p+osc_index, x->workspace[i].pan);
-    }
-
-    outlet_list(x->pan_out, ps_list, limit, x->output_p);
-    if (change) {
-        outlet_bang(x->bang_out);
-    }
-}
-
-void randint(int limit) {
-    float r = rand() / float(RAND_MAX);
-    return int(r*limit);
+int randint(int limit) {
+    float r = (float)rand() / RAND_MAX;
+    return (int)(r*limit);
 }
 
 // make an optimization step when receiving a bang
@@ -190,7 +190,7 @@ void ext_main(void* r)
             A_GIMME, // params
             0 // default value
     );
-    class_addmethod(spreader_class, (method)opt_step, "bang", A_BANG, 0);
+    class_addmethod(spreader_class, (method)opt_step, "bang", 0);
     class_addmethod(spreader_class, (method)set_new_freqs, "list", A_GIMME, 0);
     class_addmethod(spreader_class, (method)set_more_diss, "in1", A_LONG, 0);
     class_register(CLASS_BOX, spreader_class);
