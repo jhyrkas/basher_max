@@ -86,22 +86,29 @@ void set_new_freqs(t_spreader *x, t_symbol *s, long argc, t_atom *argv) {
         x->workspace[i].osc_index = i;
     }
 
+    // compute dissonance
+    x->curr_diss = get_curr_diss(x);
+}
+
+void set_uniform_spread(t_spreader *x, long s) {
+    // don't change pan
+    if (s < 1) {
+        object_error(x, "Cannot set spread for %d frequencies; must be > 0", s, 0);
+        return;
+    }
+
     // initial pan: spread frequencies as input from -1 to 1 (left to right)
-    if (limit == 1) {
+    if (s == 1) {
         x->workspace[0].pan = 0.f;
     }
     else {
-        float step = 2.f / (limit-1);
+        float step = 2.f / (s-1);
         float ppan = -1.f;
-        for (int i = 0; i < limit; i++) {
+        for (int i = 0; i < s; i++) {
             x->workspace[i].pan = ppan;
             ppan += step;
         }
     }
-
-    // compute dissonance
-    x->curr_diss = get_curr_diss(x);
-    
     send_output(x, 1);
 }
 
@@ -153,7 +160,7 @@ void opt_step(t_spreader *x) {
 }
 
 // constructor
-static void *spreader_new(t_symbol *s, int argc, t_atom *argv)
+static void *spreader_new(long n)
 {
     t_spreader *x = (t_spreader *)object_alloc(spreader_class); // create new instance
 
@@ -164,19 +171,7 @@ static void *spreader_new(t_symbol *s, int argc, t_atom *argv)
 
     x->bang_out = bangout((t_object *)x); // add outlet
     x->pan_out = listout((t_object *)x); // add outlet
-
-    // handling GIMME
-    // TODO: GIMME needed?
-    switch (argc) {
-        default : // more than 3
-        case 4: 
-        case 3:
-        case 2:
-        case 1:
-            break;
-        case 0:
-            break;
-    }
+    set_uniform_spread(x, n); // initial spread
 
     return (void *)x;
 }
@@ -190,10 +185,11 @@ void ext_main(void* r)
             (method)NULL, // destructor
     	    sizeof(t_spreader), // class size in bytes
             0L, // graphical representation, depr
-            A_GIMME, // params
+            A_DEFLONG, // initial spread
             0 // default value
     );
     class_addmethod(spreader_class, (method)opt_step, "bang", 0);
+    class_addmethod(spreader_class, (method)set_uniform_spread, "int", A_LONG, 0);
     class_addmethod(spreader_class, (method)set_new_freqs, "list", A_GIMME, 0);
     class_addmethod(spreader_class, (method)set_more_diss, "in1", A_LONG, 0);
     class_register(CLASS_BOX, spreader_class);
