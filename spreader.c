@@ -51,11 +51,13 @@ float get_curr_diss(t_spreader *x) {
     float diss = 0.f;
     for (int i = 0; i < x->limit; i++) {
         for (int j = i+1; j < x->limit; j++) {
-            float distance = fabs(x->workspace[i].pan - x->workspace[j].pan);
-            float scaler = 0.24f / (0.021f*min(x->workspace[i].frequency, x->workspace[j].frequency) + 19);
-            float F = scaler * fabs(x->workspace[i].frequency - x->workspace[j].frequency);
+            float pan_dist = fabs(x->workspace[i].pan - x->workspace[j].pan);
+            float freq_dist = fabs(x->workspace[i].frequency - x->workspace[j].frequency);
+            float min_freq = min(x->workspace[i].frequency, x->workspace[j].frequency);
+            float scaler = 0.24f / (0.021f*min_freq + 19);
+            float F = scaler * freq_dist;
             float diss_ = exp(-3.5f*F) - exp(-5.75*F);
-            diss += distance*diss_;
+            diss += (1.f/pan_dist)*diss_;
         }
     }
     return diss;
@@ -124,36 +126,40 @@ void opt_step(t_spreader *x) {
         return;
     }
 
-    int index1 = randint(x->limit);
-    int index2 = index1;
-    while (index1 == index2) {
-        index2 = randint(x->limit);
-    }
-
-    // try a swap
-    float oldpan1 = x->workspace[index1].pan;
-    float oldpan2 = x->workspace[index2].pan;
-
-    x->workspace[index1].pan = oldpan2;
-    x->workspace[index2].pan = oldpan1;
-    float tmp_diss = get_curr_diss(x);
-    float diss_diff = tmp_diss - x->curr_diss;
 
     int change = 0;
-    // change for more consonance
-    if (diss_diff < 0 && x->more_diss == 0) {
-        change = 1;
-    // change for more dissonance
-    } else if (diss_diff > 0 && x->more_diss == 1) {
-        change = 1;
-    }
+    int iters = 0;
+    while (change == 0 && iters < 100) {
+        int index1 = randint(x->limit);
+        int index2 = index1;
+        while (index1 == index2) {
+            index2 = randint(x->limit);
+        }
 
-    // swap back if it was a worse change
-    if (change == 0) {
-        x->workspace[index1].pan = oldpan1;
-        x->workspace[index2].pan = oldpan2;
-    } else {
-        x->curr_diss = tmp_diss;
+        // try a swap
+        float oldpan1 = x->workspace[index1].pan;
+        float oldpan2 = x->workspace[index2].pan;
+
+        x->workspace[index1].pan = oldpan2;
+        x->workspace[index2].pan = oldpan1;
+        float tmp_diss = get_curr_diss(x);
+        float diss_diff = tmp_diss - x->curr_diss;
+        // change for more consonance
+        if (diss_diff < 0 && x->more_diss == 0) {
+            change = 1;
+        // change for more dissonance
+        } else if (diss_diff > 0 && x->more_diss == 1) {
+            change = 1;
+        }
+
+        // swap back if it was a worse change
+        if (change == 0) {
+            x->workspace[index1].pan = oldpan1;
+            x->workspace[index2].pan = oldpan2;
+        } else {
+            x->curr_diss = tmp_diss;
+        }
+        iters++;
     }
 
     send_output(x, change);
