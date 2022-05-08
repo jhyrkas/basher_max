@@ -117,7 +117,7 @@ void whack_amps(t_whacker *x, t_symbol *s, long argc, t_atom *argv) {
                 float l_diff = c_freq - l_freq;
                 // only whack if in range and the quieter pair hasn't been whacked already
                 int eligible_index = x->workspace[i].amplitude < x->workspace[i-1].amplitude ? i : i-1;
-                if (l_diff > x->min_diff && l_diff <= min_diff_cur && x->workspace[eligible_index]) {
+                if (l_diff > x->min_diff && l_diff <= min_diff_cur && x->workspace[eligible_index].eligible) {
                     index_l = i-1; index_h=i;
                     min_diff_cur = l_diff;
                 }
@@ -133,16 +133,16 @@ void whack_amps(t_whacker *x, t_symbol *s, long argc, t_atom *argv) {
                 float h_amp = fabsf(x->workspace[index_h].amplitude);
                 float l_amp = fabsf(x->workspace[index_l].amplitude);
                 int h_sign = 2 * (x->workspace[index_h].amplitude > 0.f) - 1;
-                int h_sign = 2 * (x->workspace[index_l].amplitude > 0.f) - 1;
+                int l_sign = 2 * (x->workspace[index_l].amplitude > 0.f) - 1;
                 // whack the lower amplitude so it goes down and the higher amplitude goes up
                 if (l_amp > h_amp) {
-                    float delta = x->squash_amt * h_amp;
+                    float delta = x->whack_amt * h_amp;
                     x->workspace[index_h].amplitude = h_sign * (h_amp - delta);
                     x->workspace[index_l].amplitude = l_sign * (l_amp + delta);
                     x->workspace[index_h].eligible = 0;
                 }
                 else {
-                    float delta = x->squash_amt * l_amp;
+                    float delta = x->whack_amt * l_amp;
                     x->workspace[index_h].amplitude = h_sign * (h_amp + delta);
                     x->workspace[index_l].amplitude = l_sign * (l_amp - delta);
                     x->workspace[index_l].eligible = 0;
@@ -180,11 +180,11 @@ static void *whacker_new(t_symbol *s, int argc, t_atom *argv)
     int mem_size = MAXFREQS*sizeof(as_pair);
     memset(x->workspace, 0, mem_size);
 
-    x->freq_out = listout((t_object *)x); // add outlet
     x->whack_out = listout((t_object *)x); // add outlet
+    x->freq_out = listout((t_object *)x); // add outlet
 
     // defaults
-    x->whack_on = 1;
+    x->whacker_on = 1;
     x->min_diff = 10;
     x->max_diff = 30;
     x->whack_amt = 0.5f;
