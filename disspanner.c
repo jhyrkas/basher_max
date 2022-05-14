@@ -61,23 +61,23 @@ float get_curr_diss(t_disspanner *x) {
             // frequency distance
             float freq_dist = fabs(x->workspace[i].frequency - x->workspace[j].frequency);
             float min_freq = min(x->workspace[i].frequency, x->workspace[j].frequency);
-            float s = 0.24f / (0.021f*min_freq + 19);
+            float scaler = 0.24f / (0.021f*min_freq + 19);
             float F = scaler * freq_dist;
             float Z = exp(-3.5f*F) - exp(-5.75*F);
 
             // amplitude multipliers
             float amp_l1 = x->workspace[i].amp_l;
-            float amp_r1 = x->workspace[i].amp_l;
+            float amp_r1 = x->workspace[i].amp_r;
             float amp_l2 = x->workspace[j].amp_l;
-            float amp_r2 = x->workspace[j].amp_l;
+            float amp_r2 = x->workspace[j].amp_r;
             float amp_min_l = min(amp_l1, amp_l2);
             float amp_min_r = min(amp_r1, amp_r2);
 
-            X_l = powf(amp_l1 * amp_l2, 0.1f);
-            X_r = powf(amp_r1 * amp_r2, 0.1f);
+            float X_l = powf(amp_l1 * amp_l2, 0.1f);
+            float X_r = powf(amp_r1 * amp_r2, 0.1f);
 
-            Y_l = 0.5f * (powf((2.f * amp_min_l) / (amp_l1 + amp_l2 + epsilon), 3.11));
-            Y_r = 0.5f * (powf((2.f * amp_min_r) / (amp_r1 + amp_r2 + epsilon), 3.11));
+            float Y_l = 0.5f * (powf((2.f * amp_min_l) / (amp_l1 + amp_l2 + epsilon), 3.11));
+            float Y_r = 0.5f * (powf((2.f * amp_min_r) / (amp_r1 + amp_r2 + epsilon), 3.11));
 
             // left and right dissonance
             diss_l += X_l*Y_l*Z;
@@ -137,8 +137,8 @@ void set_uniform_spread(t_disspanner *x, long s) {
             x->workspace[i].pan = ppan;
             float arg_l = (0.5f*ppan) + 0.5f;
             float arg_r = 1.0f - arg_l;
-            x->workspace[0].amp_l = cosf(x->halfpi * arg_l);
-            x->workspace[0].amp_r = cosf(x->halfpi * arg_r);
+            x->workspace[i].amp_l = cosf(x->halfpi * arg_l);
+            x->workspace[i].amp_r = cosf(x->halfpi * arg_r);
             ppan += step;
         }
     }
@@ -157,7 +157,6 @@ void opt_step(t_disspanner *x) {
         send_output(x, 0);
         return;
     }
-
 
     int change = 0;
     int iters = 0;
