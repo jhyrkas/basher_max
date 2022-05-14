@@ -135,10 +135,9 @@ void set_uniform_spread(t_disspanner *x, long s) {
         float ppan = -1.f;
         for (int i = 0; i < s; i++) {
             x->workspace[i].pan = ppan;
-            float arg_l = (0.5f*ppan) + 0.5f;
-            float arg_r = 1.0f - arg_l;
-            x->workspace[i].amp_l = cosf(x->halfpi * arg_l);
-            x->workspace[i].amp_r = cosf(x->halfpi * arg_r);
+            float rads = ((0.5f*ppan) + 0.5f) * x->halfpi;
+            x->workspace[i].amp_l = cosf(rads);
+            x->workspace[i].amp_r = sinf(rads);
             ppan += step;
         }
     }
