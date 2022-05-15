@@ -136,9 +136,9 @@ void set_uniform_spread(t_disspanner2d *x, long s) {
         for (int i = 0; i < s; i++) {
             // keeping pan values positive just for ease of thinking...shouldn't actually matter though
             x->workspace[i].pan = ppan < 0 ? 360.f + ppan : ppan;
-            float rads = ((x->ppan/2.f)-45.f) * x->degtorad;
-            x->workspace[i].amp_l = absf(sinf(rads));
-            x->workspace[i].amp_r = absf(cosf(rads));
+            float rads = ((ppan/2.f)-45.f) * x->degtorad;
+            x->workspace[i].amp_l = fabsf(sinf(rads));
+            x->workspace[i].amp_r = fabsf(cosf(rads));
             ppan += step;
         }
     }
