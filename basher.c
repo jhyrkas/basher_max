@@ -92,15 +92,14 @@ void bash_freqs(t_basher *x, t_symbol *s, long argc, t_atom *argv) {
     // argv contains (f1, f2, f3....f_n, a1, a2, a3....a_n)
     int limit = argc/2 < MAXFREQS ? argc/2 : MAXFREQS;
 
-    // set frequencies
+    // set frequencies and amplitudes
+    // NOTE: now taking it in pairs (i.e. f1 a1 f2 a2 f3 a3 ....)
     for (int i = 0; i < limit; i++) {
-        x->workspace[i].frequency = atom_getfloat(argv+i);
-        x->workspace[i].osc_index = i;
-    }
-    // set amplitudes
-    for (int i = 0; i < limit; i++) {
-        x->workspace[i].amplitude = atom_getfloat(argv+limit+i);
+        int ind = 2*i;
+        x->workspace[i].frequency = atom_getfloat(argv+ind);
+        x->workspace[i].amplitude = atom_getfloat(argv+ind+1);
         x->workspace[i].bashed_amp = x->workspace[i].amplitude;
+        x->workspace[i].osc_index = i;
     }
 
     // slow but thorough bashing: start by merging the smallest difference in range and then continue until no more are found
