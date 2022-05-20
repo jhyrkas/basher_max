@@ -62,10 +62,10 @@ float get_curr_diss(t_disspanner2d *x) {
             float Z = exp(-3.5f*F) - exp(-5.75*F);
 
             // amplitude multipliers
-            float amp_l1 = x->workspace[i].amp_l;
-            float amp_r1 = x->workspace[i].amp_r;
-            float amp_l2 = x->workspace[j].amp_l;
-            float amp_r2 = x->workspace[j].amp_r;
+            float amp_l1 = x->workspace[i].amp_l * x->workspace[i].osc_amp;
+            float amp_r1 = x->workspace[i].amp_r * x->workspace[i].osc_amp;
+            float amp_l2 = x->workspace[j].amp_l * x->workspace[j].osc_amp;
+            float amp_r2 = x->workspace[j].amp_r * x->workspace[j].osc_amp;
             float amp_min_l = min(amp_l1, amp_l2);
             float amp_min_r = min(amp_r1, amp_r2);
 
