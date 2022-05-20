@@ -19,16 +19,12 @@ static t_class *disspanner_class;
 // for sorting and panning
 typedef struct _freq_pan
 {
-    float frequency;
-    int osc_index;
-    float pan;
-    float amp_l;
-    float amp_r;
+    float frequency; // freq of oscillator
+    float osc_amp; // amplitude of the actual oscillator
+    float pan; // pan value
+    float amp_l; // pan power for left ear
+    float amp_r; // pan power for right ear
 } freq_pan;
-
-int freq_pan_compar(const void* p1, const void* p2) {
-    return ((freq_pan*)p1)->frequency - ((freq_pan*)p2)->frequency;
-}
 
 typedef struct _disspanner
 {
@@ -66,10 +62,10 @@ float get_curr_diss(t_disspanner *x) {
             float Z = exp(-3.5f*F) - exp(-5.75*F);
 
             // amplitude multipliers
-            float amp_l1 = x->workspace[i].amp_l;
-            float amp_r1 = x->workspace[i].amp_r;
-            float amp_l2 = x->workspace[j].amp_l;
-            float amp_r2 = x->workspace[j].amp_r;
+            float amp_l1 = x->workspace[i].amp_l * x->workspace[i].osc_amp;
+            float amp_r1 = x->workspace[i].amp_r * x->workspace[i].osc_amp;
+            float amp_l2 = x->workspace[j].amp_l * x->workspace[j].osc_amp;
+            float amp_r2 = x->workspace[j].amp_r * x->workspace[j].osc_amp;
             float amp_min_l = min(amp_l1, amp_l2);
             float amp_min_r = min(amp_r1, amp_r2);
 
@@ -91,8 +87,7 @@ float get_curr_diss(t_disspanner *x) {
 void send_output(t_disspanner *x, int change) {
     // output pan
     for (int i = 0; i < x->limit; i++) {
-        int osc_index = x->workspace[i].osc_index; // this aligns the inputs and outputs in case of sorting
-        SETFLOAT(x->output_p+osc_index, x->workspace[i].pan);
+        SETFLOAT(x->output_p+i, x->workspace[i].pan);
     }
 
     outlet_list(x->pan_out, ps_list, x->limit, x->output_p);
@@ -104,13 +99,17 @@ void send_output(t_disspanner *x, int change) {
 // this sets the frequencies and computes the current dissonance
 void set_new_freqs(t_disspanner *x, t_symbol *s, long argc, t_atom *argv) {
     // argv contains (f1, f2, f3....f_n)
-    int limit = argc < MAXFREQS ? argc : MAXFREQS;
+    int limit = argc / 2 < MAXFREQS ? argc / 2 : MAXFREQS;
     x->limit = limit;
 
     // set frequencies
     for (int i = 0; i < limit; i++) {
         x->workspace[i].frequency = atom_getfloat(argv+i);
-        x->workspace[i].osc_index = i;
+    }
+
+    // set amps
+    for (int i = 0; i < limit; i++) {
+        x->workspace[i].osc_amp = atom_getfloat(argv+limit+i);
     }
 
     // compute dissonance

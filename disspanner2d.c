@@ -20,15 +20,11 @@ static t_class *disspanner2d_class;
 typedef struct _freq_pan
 {
     float frequency;
-    int osc_index;
+    float osc_amp;
     float pan;
     float amp_l;
     float amp_r;
 } freq_pan;
-
-int freq_pan_compar(const void* p1, const void* p2) {
-    return ((freq_pan*)p1)->frequency - ((freq_pan*)p2)->frequency;
-}
 
 typedef struct _disspanner2d
 {
@@ -91,8 +87,7 @@ float get_curr_diss(t_disspanner2d *x) {
 void send_output(t_disspanner2d *x, int change) {
     // output pan
     for (int i = 0; i < x->limit; i++) {
-        int osc_index = x->workspace[i].osc_index; // this aligns the inputs and outputs in case of sorting
-        SETFLOAT(x->output_p+osc_index, x->workspace[i].pan);
+        SETFLOAT(x->output_p+i, x->workspace[i].pan);
     }
 
     outlet_list(x->pan_out, ps_list, x->limit, x->output_p);
@@ -104,13 +99,17 @@ void send_output(t_disspanner2d *x, int change) {
 // this sets the frequencies and computes the current dissonance
 void set_new_freqs(t_disspanner2d *x, t_symbol *s, long argc, t_atom *argv) {
     // argv contains (f1, f2, f3....f_n)
-    int limit = argc < MAXFREQS ? argc : MAXFREQS;
+    int limit = argc / 2 < MAXFREQS ? argc / 2 : MAXFREQS;
     x->limit = limit;
 
     // set frequencies
     for (int i = 0; i < limit; i++) {
         x->workspace[i].frequency = atom_getfloat(argv+i);
-        x->workspace[i].osc_index = i;
+    }
+
+    // set amps
+    for (int i = 0; i < limit; i++) {
+        x->workspace[i].osc_amp = atom_getfloat(argv+limit+i);
     }
 
     // compute dissonance

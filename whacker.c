@@ -162,8 +162,8 @@ void whack_amps(t_whacker *x, t_symbol *s, long argc, t_atom *argv) {
         SETFLOAT(x->output_a+osc_index, x->workspace[i].amplitude);
     }
 
-    outlet_list(x->freq_out, ps_list, limit, x->output_f);
     outlet_list(x->whack_out, ps_list, limit, x->output_a);
+    outlet_list(x->freq_out, ps_list, limit, x->output_f);
 }
 
 // constructor
