@@ -8,14 +8,11 @@
 #pragma warning( disable : 4244 )
 #pragma warning( disable : 4305 )
 #endif
-#define MAXFREQS 128 // arbitrary global value for memory allocation
 #define max(a,b) a > b ? a : b
 
-// copied from old ext_mess.h...bad idea??
-#define SETFLOAT(ap, x) ((ap)->a_type = A_FLOAT, (ap)->a_w.w_float = (x))
 /* ------------------------ whacker~ ----------------------------- */
 
-static t_class *whacker_class;
+static t_class *mcwhacker_class;
 
 // for sorting and whacking
 typedef struct _as_pairs
@@ -34,9 +31,7 @@ typedef struct _whacker
 {
     t_pxobject x_obj; 	            /* obligatory header */
     int num_pairs;                  // number of freq/amp pairs (implementation could be changed)
-    as_pair workspace[MAXFREQS];    // workspace for whacking
-    t_atom output_f[MAXFREQS];      // local memory for frequency output
-    t_atom output_a[MAXFREQS];      // local memory for amplitude output
+    as_pair workspace[50];          // workspace for whacking # TODO: hard code max good idea?
     float min_diff;                 // min of threshold
     float max_diff;                 // max of threshold
     float whack_amt;                // figure out what this parameter means
@@ -85,7 +80,7 @@ void set_amt(t_mcwhacker *x, double f) {
 
 void set_freq_amp_pairs(t_mcwhacker *x, t_symbol *s, long argc, t_atom *argv) {
     // argv contains (f1, f2, f3....f_n, a1, a2, a3....a_n)
-    int limit = argc/2 < num_pairs ? argc/2 : num_pairs;
+    int limit = argc/2 < x->num_pairs ? argc/2 : x->num_pairs;
 
     // set frequencies and amplitudes
     // NOTE: now taking it in pairs (i.e. f1 a1 f2 a2 f3 a3 ....)
@@ -98,10 +93,6 @@ void set_freq_amp_pairs(t_mcwhacker *x, t_symbol *s, long argc, t_atom *argv) {
     }
 }
 
-void mcwhacker_dsp64(t_mcwhacker *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags)
-{
-    object_method(dsp64, gensym("dsp_add64"), x, mcwhacker_perform64, 0, NULL);
-}
 
 long mcwhacker_multichanneloutputs(t_mcwhacker *x, long outletindex)
 {
@@ -111,7 +102,7 @@ long mcwhacker_multichanneloutputs(t_mcwhacker *x, long outletindex)
 // set the freqs
 void mcwhacker_perform64(t_mcwhacker *x, t_object *dsp64, double **ins, long numins, double **outs, long numouts, long sampleframes, long flags, void *userparam) {
     // argv contains (f1, f2, f3....f_n, a1, a2, a3....a_n)
-    int limit = argc/2 < MAXFREQS ? argc/2 : MAXFREQS;
+    int limit = x->num_pairs;
 
     // slow but thorough whacking: start with the smallest difference in range and then continue until no more are found
     if (x->whacker_on) {
@@ -181,31 +172,30 @@ void mcwhacker_perform64(t_mcwhacker *x, t_object *dsp64, double **ins, long num
     }
 }
 
+void mcwhacker_dsp64(t_mcwhacker *x, t_object *dsp64, short *count, double samplerate, long maxvectorsize, long flags)
+{
+    object_method(dsp64, gensym("dsp_add64"), x, mcwhacker_perform64, 0, NULL);
+}
+
 // constructor
 static void *whacker_new(t_symbol *s, int argc, t_atom *argv)
 {
-    t_mcwhacker *x = (t_mcwhacker *)object_alloc(whacker_class); // create new instance
+    t_mcwhacker *x = (t_mcwhacker *)object_alloc(mcwhacker_class); // create new instance
+
+    // defaults
+    x->whacker_on = 0;
+    x->min_diff = 10;
+    x->max_diff = 30;
+    x->whack_amt = 0.5f;
+    x->num_pairs = 10;
 
     floatin(x,4); // whack amt
     floatin(x,3); // max inlet
     floatin(x,2); // min inlet
     intin(x,1); // toggle
-
-    int mem_size = MAXFREQS*sizeof(as_pair);
-    memset(x->workspace, 0, mem_size);
-
-    x->whack_out = listout((t_object *)x); // add outlet
-    x->freq_out = listout((t_object *)x); // add outlet
-
-    // defaults
-    x->whacker_on = 1;
-    x->min_diff = 10;
-    x->max_diff = 30;
-    x->whack_amt = 0.5f;
-    x->num_pairs = 10;
     // handling GIMME
     switch (argc) {
-        default : // more than 3
+        default :
         case 5: 
             x->whack_amt = atom_getfloat(argv+4);
         case 4:
@@ -215,19 +205,23 @@ static void *whacker_new(t_symbol *s, int argc, t_atom *argv)
         case 2:
             x->whacker_on = atom_getfloat(argv+1) > 0 ? 1 : 0;
         case 1:
-            x->num_pairs = atom_getint(argv);
-            break;
+            x->num_pairs = atom_getlong(argv);
         case 0:
             break;
     }
 
     if (x->min_diff >= x->max_diff || x->min_diff <= 0 || x->max_diff <= 1 || x->whack_amt < 0.f || x->whack_amt > 1.f || x->num_pairs < 1) {
         object_error((t_object *)x, "need num_pairs > 0, min_diff < max_diff, min >= 0 Hz and max >= 1 Hz, 0 <= whack_amt <= 1. using default params");
+        x->whacker_on = 0;
         x->min_diff = 10;
         x->max_diff = 30;
         x->whack_amt = 0.5f;
         x->num_pairs = 10;
     }
+
+    int mem_size = x->num_pairs*sizeof(as_pair);
+    memset(x->workspace, 0, mem_size);
+    
     dsp_setup((t_pxobject *)x, 0);
     outlet_new((t_object *)x, "multichannelsignal");    // amps
     outlet_new((t_object *)x, "multichannelsignal");    // freqs
@@ -245,7 +239,7 @@ void mcpack_free(t_mcwhacker *x)
 void ext_main(void* r)
 {
     ps_list = gensym("list");
-    t_class* mcwhacker_class = class_new(
+    mcwhacker_class = class_new(
             "mc.whacker~", // class name
             (method)whacker_new, // constructor
             (method)mcpack_free, // destructor
@@ -260,7 +254,7 @@ void ext_main(void* r)
     class_addmethod(mcwhacker_class, (method)set_min, "ft2", A_FLOAT, 0);
     class_addmethod(mcwhacker_class, (method)set_max, "ft3", A_FLOAT, 0);
     class_addmethod(mcwhacker_class, (method)set_amt, "ft4", A_FLOAT, 0);
-    class_addmethod(c, (method)mcwhacker_multichanneloutputs, "multichanneloutputs", A_CANT, 0);
+    class_addmethod(mcwhacker_class, (method)mcwhacker_multichanneloutputs, "multichanneloutputs", A_CANT, 0);
 
     class_dspinit(mcwhacker_class);
     class_register(CLASS_BOX, mcwhacker_class);
