@@ -96,7 +96,7 @@ void set_freq_amp_pairs(t_mcwhacker *x, t_symbol *s, long argc, t_atom *argv) {
 
 long mcwhacker_multichanneloutputs(t_mcwhacker *x, long outletindex)
 {
-    return x->num_pairs * 2;
+    return x->num_pairs;
 }
 
 // set the freqs
@@ -166,8 +166,8 @@ void mcwhacker_perform64(t_mcwhacker *x, t_object *dsp64, double **ins, long num
     for (int i = 0; i < sampleframes; i++) {
         for (int ch = 0; ch < numouts/2; ch++) {
             int osc_index = x->workspace[ch].osc_index;
-            outs[osc_index][i] = x->workspace[ch].amplitude;
-            outs[numouts/2 + osc_index][i] = x->workspace[ch].frequency; 
+            outs[osc_index][i] = x->workspace[ch].frequency;
+            outs[numouts/2 + osc_index][i] = x->workspace[ch].amplitude; 
         }
     }
 }
@@ -219,12 +219,12 @@ static void *whacker_new(t_symbol *s, int argc, t_atom *argv)
         x->num_pairs = 10;
     }
 
-    int mem_size = x->num_pairs*sizeof(as_pair);
-    memset(x->workspace, 0, mem_size);
-    
     dsp_setup((t_pxobject *)x, 0);
     outlet_new((t_object *)x, "multichannelsignal");    // amps
     outlet_new((t_object *)x, "multichannelsignal");    // freqs
+    
+    int mem_size = 50*sizeof(as_pair); // TODO: better max?
+    memset(x->workspace, 0, mem_size);
     return (void *)x;
 }
 
