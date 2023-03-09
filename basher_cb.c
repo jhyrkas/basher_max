@@ -158,6 +158,9 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
     // sort by frequency
     // sorting and conditionals seems like this couldn't be at audio rate without a lot of thinking...
     qsort(x->workspace, limit, sizeof(as_pair), pair_compar);
+
+    // OLD IMPLEMENTATION
+    /*
     while (search && iters < 100) {
         // finding the best candidate for bashing
         // asymptotically n^2 but hopefully not in practice
@@ -195,14 +198,35 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
             float new_freq = get_new_freq(x->workspace[stable_index].frequency, x->workspace[change_index].frequency, x->min_bw, x->max_bw, x->diss == 0);
             x->workspace[change_index].frequency = old_freq + x->perc_move * (new_freq - old_freq);
             x->workspace[change_index].bashed = 1;
-            
-         // or stop searching
+        // or stop searching
         } else {
             search = 0;
         }
         iters++;
     }
+    */
 
+    // NEW IMPLEMENTATION
+    for (int i = 0; i < limit-1; i++) {
+        for (int j = i+1; j < limit; j++) {
+            const float f_i = x->workspace[i].frequency;
+            const float f_j = x->workspace[j].frequency;
+            if (x->workspace[j].bashed) {continue;}
+            float cb = get_cb(f_i, f_j);
+            float perc_bw = (f_j - f_i) / cb;
+            if (perc_bw < x-> min_bw) {continue;}
+            // break loop early
+            if (perc_bw > x->max_bw) {break;}
+            int i_louder = x->workspace[i].amplitude > x->workspace[j].amplitude; // bool
+            int stable_index = i_louder ? i : j;
+            int change_index = i_louder? j : i;
+            const float old_freq = x->workspace[change_index].frequency;
+            float new_freq = get_new_freq(x->workspace[stable_index].frequency, x->workspace[change_index].frequency, x->min_bw, x->max_bw, x->diss == 0);
+            x->workspace[change_index].frequency = old_freq + x->perc_move * (new_freq - old_freq);
+            x->workspace[change_index].bashed = 1;
+            if (change_index == i) {break;}
+        }
+    }
     // output lists regardless of bashing
     for (int i = 0; i < limit; i++) {
         int osc_index = x->workspace[i].osc_index; // this aligns the inputs and outputs in case of sorting
