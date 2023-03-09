@@ -17,7 +17,7 @@
 /* ------------------------ basher_cb~ ----------------------------- */
 
 // num_barks = 25
-static const float[] barks = {20., 100., 200., 300., 400., 510., 630., 770., 920., 1080., 1270., 1480., \
+static const float barks[] = {20., 100., 200., 300., 400., 510., 630., 770., 920., 1080., 1270., 1480., \
                 1720., 2000., 2320., 2700., 3150., 3700., 4400., 5300., 6400., 7700., 9500., 12000., 15500.};
 
 static t_class *basher_cb_class;
@@ -45,7 +45,18 @@ float get_cb(const float f1, const float f2) {
         cb2 = f2 > barks[i] ? i : cb2;
     }
 
-    return avg_bandwidth = ((barks[cb1+1] - barks[cb1]) + (barks[cb2+1] - barks[cb2]))*0.5;
+    return ((barks[cb1+1] - barks[cb1]) + (barks[cb2+1] - barks[cb2]))*0.5;
+}
+
+float roughness_sethares(const float f1, const float f2) {
+    const float a = -3.5;
+    const float b = -5.75;
+    const float d = 0.24;
+    const float s1 = 0.021;
+    const float s2 = 19;
+    const float s = d / (s1 * min(f1,f2) + s2);
+    const float freq_diff = fabsf(f1-f2);
+    return exp(a*s*freq_diff) - exp(b*s*freq_diff);
 }
 
 float get_new_freq(const float f_const, const float f_change, float bw_low, float bw_high, bool cons) {
@@ -56,30 +67,19 @@ float get_new_freq(const float f_const, const float f_change, float bw_low, floa
     float freq_step = (freq_high - freq_low) / 100.;
     float r_curr = roughness_sethares(freq_low, f_const);
     float new_freq = freq_low;
-    float tmp_freq = few_low;
+    float tmp_freq = freq_low;
     for (int i = 1; i < 100; i++) {
         tmp_freq += freq_step;
         float new_r = roughness_sethares(tmp_freq, f_const);
-        if (const && new_r < r_curr) {
+        if (cons && new_r < r_curr) {
             r_curr = new_r;
-            new_freq = tmp_frq;
+            new_freq = tmp_freq;
         } else if (!cons && new_r > r_curr) {
             r_curr = new_r;
-            new_freq = tmp_frq;
+            new_freq = tmp_freq;
         }
     }
     return new_freq;
-}
-
-float roughness_sethares(const float f1, const float f2) {
-    const float a = -3.5;
-    const float b = -5.75;
-    const float d = 0.24;
-    const float s1 = 0.021;
-    const float s2 = 19;
-    const float s = d / (s1 * min(f1,f2) + s2);
-    const float freq_diff = abs(f1-f2);
-    return v1*v2*(exp(a*s*freq_diff) - exp(b*s*freq_diff));
 }
 
 typedef struct _basher_cb
@@ -88,8 +88,8 @@ typedef struct _basher_cb
     as_pair workspace[MAXFREQS];    // workspace for bashing
     t_atom output_f[MAXFREQS];      // local memory for frequency output
     t_atom output_a[MAXFREQS];      // local memory for amplitude output
-    float min_cw;                   // min of threshold in critical bw
-    float max_cw;                   // max of threshold in critical bw
+    float min_bw;                   // min of threshold in critical bw
+    float max_bw;                   // max of threshold in critical bw
     int diss;                       // bool: consonance or dissonance mode
     float perc_move;                // percentage the frequency will move to min/max consonance: 0 means basher is off
     void *amp_out;                  // output for amplitudes (right now it is just a pass through)
@@ -109,11 +109,11 @@ void set_perc_move(t_basher_cb *x, float p) {
 // set the threshold min
 void set_min(t_basher_cb *x, double p) {
     if (p < 0. || p > 1.){
-        object_error((t_object *)x, "received %f: min_cw must be 0. <= p <= 1.; ignoring argument", p);
+        object_error((t_object *)x, "received %f: min_bw must be 0. <= p <= 1.; ignoring argument", p);
         return;
     }
-    if (p >= x->max_cw) {
-        object_error((t_object *)x, "min_cw must be smaller than max_cw");
+    if (p >= x->max_bw) {
+        object_error((t_object *)x, "min_bw must be smaller than max_bw");
         return;
     }
     x->min_bw = p;
@@ -121,11 +121,11 @@ void set_min(t_basher_cb *x, double p) {
 // set the threshold max
 void set_max(t_basher_cb *x, double p) {
     if (p < 0. || p > 1.){
-        object_error((t_object *)x, "received %f: max_cw must be 0. <= p <= 1.; ignoring argument", p);
+        object_error((t_object *)x, "received %f: max_bw must be 0. <= p <= 1.; ignoring argument", p);
         return;
     }
-    if (p <= x->min_cw) {
-        object_error((t_object *)x, "max_cw must be larger than min_cw");
+    if (p <= x->min_bw) {
+        object_error((t_object *)x, "max_bw must be larger than min_bw");
         return;
     }
     x->max_bw = p;
@@ -164,8 +164,8 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
         float max_r = 0;
         for (int i = 0; i < limit-1; i++) {
             for (int j = i+1; j < limit; j++) {
-                const float f_i = x->workspace[i];
-                const float f_j = x->workspace[j];
+                const float f_i = x->workspace[i].frequency;
+                const float f_j = x->workspace[j].frequency;
                 if (x->workspace[j].bashed) {continue;}
                 float cb = get_cb(f_i, f_j);
                 float perc_bw = (f_j - f_i) / cb;
@@ -182,9 +182,9 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
         }
         // something is eligible for bashing
         if (index_l != index_h) {
-            int low_louder = x->workspace[index_l].amp > x->workspace[index_h].amp; // bool
-            int stable_index = low_louder ? index_l : index_r;
-            int change_index = low_louder? index_r : index_l;
+            int low_louder = x->workspace[index_l].amplitude > x->workspace[index_h].amplitude; // bool
+            int stable_index = low_louder ? index_l : index_h;
+            int change_index = low_louder? index_h : index_l;
             const float old_freq = x->workspace[stable_index].frequency;
             float new_freq = get_new_freq(x->workspace[stable_index].frequency, x->workspace[change_index].frequency, x->min_bw, x->max_bw, x->diss > 0);
             x->workspace[change_index].frequency = old_freq + x->perc_move * (new_freq - old_freq);
@@ -232,9 +232,9 @@ static void *basher_cb_new(t_symbol *s, int argc, t_atom *argv)
     switch (argc) {
         default : // more than 3
         case 4: 
-            x->diss = atom_getint(argv+3) > 0;
+            x->diss = atom_getlong(argv+3) > 0;
         case 3:
-            x->perc_movw = atom_getfloat(argv+2);
+            x->perc_move = atom_getfloat(argv+2);
         case 2:
             x->max_bw = atom_getfloat(argv+1);
         case 1:
@@ -244,7 +244,7 @@ static void *basher_cb_new(t_symbol *s, int argc, t_atom *argv)
             break;
     }
 
-    if (x->min_bw < 0. || x->min_bw > 1. || x->max_bw < 0. || x->max_bw > 1. || x->perc_move < 0. || x->perc_move > 1. || x->min_bw >= x->max_bw)
+    if (x->min_bw < 0. || x->min_bw > 1. || x->max_bw < 0. || x->max_bw > 1. || x->perc_move < 0. || x->perc_move > 1. || x->min_bw >= x->max_bw) {
         object_error((t_object *)x, "all percents must be 0 <= p <= 1, and minimum must be below maximum. returning to default values");
         x->min_bw = .1;
         x->max_bw = .35;
