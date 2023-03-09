@@ -38,8 +38,8 @@ int pair_compar(const void* p1, const void* p2) {
 
 // this could be a bad idea but hopefully it doesn't take up too much time looping
 float get_cb(const float f1, const float f2) {
-    int cb1 = 1;
-    int cb2 = 1;
+    int cb1 = 0;
+    int cb2 = 0;
     for (int i = 0; i < NUMBARKS-1; i++) {
         cb1 = f1 > barks[i] ? i : cb1;
         cb2 = f2 > barks[i] ? i : cb2;
@@ -140,7 +140,7 @@ void set_diss(t_basher_cb *x, int d) {
 // set the freqs
 void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
     // argv contains (f1, f2, f3....f_n, a1, a2, a3....a_n)
-    int limit = argc/2 < MAXFREQS ? argc/2 : MAXFREQS;
+    long limit = argc/2 < MAXFREQS ? argc/2 : MAXFREQS;
 
     // set frequencies and amplitudes
     // NOTE: now taking it in pairs (i.e. f1 a1 f2 a2 f3 a3 ....)
@@ -163,6 +163,7 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
         // asymptotically n^2 but hopefully not in practice
         int index_l, index_h = 0;
         float max_r = 0;
+        
         for (int i = 0; i < limit-1; i++) {
             for (int j = i+1; j < limit; j++) {
                 const float f_i = x->workspace[i].frequency;
@@ -181,8 +182,12 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
                 }
             }
         }
+        
         // something is eligible for bashing
         if (index_l != index_h) {
+            assert(index_l >= 0 && index_l < limit);
+            assert(index_l >= 0 && index_l < limit);
+            
             int low_louder = x->workspace[index_l].amplitude > x->workspace[index_h].amplitude; // bool
             int stable_index = low_louder ? index_l : index_h;
             int change_index = low_louder? index_h : index_l;
@@ -190,6 +195,7 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
             float new_freq = get_new_freq(x->workspace[stable_index].frequency, x->workspace[change_index].frequency, x->min_bw, x->max_bw, x->diss == 0);
             x->workspace[change_index].frequency = old_freq + x->perc_move * (new_freq - old_freq);
             x->workspace[change_index].bashed = 1;
+            
          // or stop searching
         } else {
             search = 0;
