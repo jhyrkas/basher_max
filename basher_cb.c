@@ -64,6 +64,8 @@ float get_new_freq(const float f_const, const float f_change, float bw_low, floa
     float freq_low = f_change < f_const ? f_const - (bw_high*bw) : f_const + (bw_low*bw);
     float freq_high = f_change < f_const ? f_const - (bw_low*bw) : f_const + (bw_high*bw);
 
+    post("%f %f %f", bw, freq_low, freq_high);
+
     float freq_step = (freq_high - freq_low) / 100.;
     float r_curr = roughness_sethares(freq_low, f_const);
     float new_freq = freq_low;
@@ -98,7 +100,7 @@ typedef struct _basher_cb
 
 t_symbol *ps_list; // needed for list output? based on thresh.c example in max-sdk
 
-void set_perc_move(t_basher_cb *x, float p) {
+void set_perc_move(t_basher_cb *x, double p) {
     if (p < 0. || p > 1.){
         object_error((t_object *)x, "received %f: perc_move must be 0. <= p <= 1.; ignoring argument", p);
         return;
@@ -186,7 +188,8 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
             int stable_index = low_louder ? index_l : index_h;
             int change_index = low_louder? index_h : index_l;
             const float old_freq = x->workspace[stable_index].frequency;
-            float new_freq = get_new_freq(x->workspace[stable_index].frequency, x->workspace[change_index].frequency, x->min_bw, x->max_bw, x->diss > 0);
+            float new_freq = get_new_freq(x->workspace[stable_index].frequency, x->workspace[change_index].frequency, x->min_bw, x->max_bw, x->diss == 0);
+            object_post((t_object *)x, "new freq %f", new_freq);
             x->workspace[change_index].frequency = old_freq + x->perc_move * (new_freq - old_freq);
             x->workspace[change_index].bashed = 1;
          // or stop searching
@@ -212,7 +215,7 @@ static void *basher_cb_new(t_symbol *s, int argc, t_atom *argv)
 {
     t_basher_cb *x = (t_basher_cb *)object_alloc(basher_cb_class); // create new instance
 
-    intin(x,4);     // toggle
+    floatin(x,4);   // toggle
     floatin(x,3);   // perc_move
     floatin(x,2);   // max_bw
     floatin(x,1);   // min_bw
@@ -232,7 +235,7 @@ static void *basher_cb_new(t_symbol *s, int argc, t_atom *argv)
     switch (argc) {
         default : // more than 3
         case 4: 
-            x->diss = atom_getlong(argv+3) > 0;
+            x->diss = atom_getfloat(argv+3) > 0;
         case 3:
             x->perc_move = atom_getfloat(argv+2);
         case 2:
@@ -266,9 +269,9 @@ void ext_main(void* r)
             0 // default value
     );
     class_addmethod(basher_cb_class, (method)bash_freqs, "list", A_GIMME, 0);
-    class_addmethod(basher_cb_class, (method)set_perc_move, "ft1", A_FLOAT, 0);
-    class_addmethod(basher_cb_class, (method)set_min, "ft2", A_FLOAT, 0);
-    class_addmethod(basher_cb_class, (method)set_max, "ft3", A_FLOAT, 0);
-    class_addmethod(basher_cb_class, (method)set_diss, "in4", A_LONG, 0);
+    class_addmethod(basher_cb_class, (method)set_min, "ft1", A_FLOAT, 0);
+    class_addmethod(basher_cb_class, (method)set_max, "ft2", A_FLOAT, 0);
+    class_addmethod(basher_cb_class, (method)set_perc_move, "ft3", A_FLOAT, 0);
+    class_addmethod(basher_cb_class, (method)set_diss, "ft4", A_FLOAT, 0);
     class_register(CLASS_BOX, basher_cb_class);
 }
