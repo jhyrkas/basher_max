@@ -54,17 +54,15 @@ float roughness_sethares(const float f1, const float f2) {
     const float d = 0.24;
     const float s1 = 0.021;
     const float s2 = 19;
-    const float s = d / (s1 * min(f1,f2) + s2);
+    const float s = d / (s1 * fminf(f1,f2) + s2);
     const float freq_diff = fabsf(f1-f2);
-    return exp(a*s*freq_diff) - exp(b*s*freq_diff);
+    return expf(a*s*freq_diff) - expf(b*s*freq_diff);
 }
 
 float get_new_freq(const float f_const, const float f_change, float bw_low, float bw_high, bool cons) {
     const float bw = get_cb(f_const, f_change);
     float freq_low = f_change < f_const ? f_const - (bw_high*bw) : f_const + (bw_low*bw);
     float freq_high = f_change < f_const ? f_const - (bw_low*bw) : f_const + (bw_high*bw);
-
-    post("%f %f %f", bw, freq_low, freq_high);
 
     float freq_step = (freq_high - freq_low) / 100.;
     float r_curr = roughness_sethares(freq_low, f_const);
@@ -100,6 +98,7 @@ typedef struct _basher_cb
 
 t_symbol *ps_list; // needed for list output? based on thresh.c example in max-sdk
 
+// TODO: look up, why do these have to be doubles and not floats???
 void set_perc_move(t_basher_cb *x, double p) {
     if (p < 0. || p > 1.){
         object_error((t_object *)x, "received %f: perc_move must be 0. <= p <= 1.; ignoring argument", p);
@@ -187,9 +186,8 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
             int low_louder = x->workspace[index_l].amplitude > x->workspace[index_h].amplitude; // bool
             int stable_index = low_louder ? index_l : index_h;
             int change_index = low_louder? index_h : index_l;
-            const float old_freq = x->workspace[stable_index].frequency;
+            const float old_freq = x->workspace[change_index].frequency;
             float new_freq = get_new_freq(x->workspace[stable_index].frequency, x->workspace[change_index].frequency, x->min_bw, x->max_bw, x->diss == 0);
-            object_post((t_object *)x, "new freq %f", new_freq);
             x->workspace[change_index].frequency = old_freq + x->perc_move * (new_freq - old_freq);
             x->workspace[change_index].bashed = 1;
          // or stop searching
