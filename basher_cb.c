@@ -133,7 +133,7 @@ void set_max(t_basher_cb *x, double p) {
 }
 
 // set the bash amt
-void set_diss(t_basher_cb *x, int d) {
+void set_diss(t_basher_cb *x, double d) {
     x->diss = d > 0 ? 1 : 0;
 }
 
