@@ -14,13 +14,13 @@
 
 // copied from old ext_mess.h...bad idea??
 #define SETFLOAT(ap, x) ((ap)->a_type = A_FLOAT, (ap)->a_w.w_float = (x))
-/* ------------------------ basher_cb~ ----------------------------- */
+/* ------------------------ whacker_cb~ ----------------------------- */
 
 // num_barks = 25
 static const float barks[] = {20., 100., 200., 300., 400., 510., 630., 770., 920., 1080., 1270., 1480., \
                 1720., 2000., 2320., 2700., 3150., 3700., 4400., 5300., 6400., 7700., 9500., 12000., 15500.};
 
-static t_class *basher_cb_class;
+static t_class *whacker_cb_class;
 
 // for sorting and bashing
 typedef struct _as_pairs
@@ -28,8 +28,7 @@ typedef struct _as_pairs
     float frequency;
     float amplitude;
     int osc_index;
-    // temporary variable for accumlated amplitude when fully fusing harmonics (bash_amt = 0)
-    int bashed;
+    int whacked;
 } as_pair;
 
 int pair_compar(const void* p1, const void* p2) {
@@ -37,7 +36,7 @@ int pair_compar(const void* p1, const void* p2) {
 }
 
 // this could be a bad idea but hopefully it doesn't take up too much time looping
-float get_cb(float f1, float f2) {
+float get_cb(const float f1, const float f2) {
     int cb1 = 0;
     int cb2 = 0;
     for (int i = 0; i < NUMBARKS-1; i++) {
@@ -48,54 +47,18 @@ float get_cb(float f1, float f2) {
     return ((barks[cb1+1] - barks[cb1]) + (barks[cb2+1] - barks[cb2]))*0.5;
 }
 
-float hz_to_bark(float f) {
-    return ((26.81f*f)/(1960.f+f)) - 0.53f;
-}
-
-float bark_to_hz(float z) {
-    return (1960.f*(z+0.53f)) / (26.28f-z);
-}
-
-float roughness_sethares(float f1, float f2) {
-    float a = -3.5;
-    float b = -5.75;
-    float d = 0.24;
-    float s1 = 0.021;
-    float s2 = 19;
-    float s = d / (s1 * fminf(f1,f2) + s2);
-    float freq_diff = fabsf(f1-f2);
+float roughness_sethares(const float f1, const float f2) {
+    const float a = -3.5;
+    const float b = -5.75;
+    const float d = 0.24;
+    const float s1 = 0.021;
+    const float s2 = 19;
+    const float s = d / (s1 * fminf(f1,f2) + s2);
+    const float freq_diff = fabsf(f1-f2);
     return expf(a*s*freq_diff) - expf(b*s*freq_diff);
 }
 
-float get_new_freq(float f_const, float f_change, float bw_low, float bw_high, bool cons) {
-    /*
-    const float bw = get_cb(f_const, f_change);
-    float freq_low = f_change < f_const ? f_const - (bw_high*bw) : f_const + (bw_low*bw);
-    float freq_high = f_change < f_const ? f_const - (bw_low*bw) : f_const + (bw_high*bw);
-    */
-    float const_bark = hz_to_bark(f_const);
-    float freq_low = f_change < f_const ? bark_to_hz(const_bark - bw_high) : bark_to_hz(const_bark + bw_low);
-    float freq_high = f_change < f_const ? bark_to_hz(const_bark - bw_low) : bark_to_hz(const_bark + bw_high);
-
-    float freq_step = (freq_high - freq_low) / 100.;
-    float r_curr = roughness_sethares(freq_low, f_const);
-    float new_freq = freq_low;
-    float tmp_freq = freq_low;
-    for (int i = 1; i < 100; i++) {
-        tmp_freq += freq_step;
-        float new_r = roughness_sethares(tmp_freq, f_const);
-        if (cons && new_r < r_curr) {
-            r_curr = new_r;
-            new_freq = tmp_freq;
-        } else if (!cons && new_r > r_curr) {
-            r_curr = new_r;
-            new_freq = tmp_freq;
-        }
-    }
-    return new_freq;
-}
-
-typedef struct _basher_cb
+typedef struct _whacker_cb
 {
     t_object x_obj; 	            /* obligatory header */
     as_pair workspace[MAXFREQS];    // workspace for bashing
@@ -104,15 +67,15 @@ typedef struct _basher_cb
     float min_bw;                   // min of threshold in critical bw
     float max_bw;                   // max of threshold in critical bw
     int diss;                       // bool: consonance or dissonance mode
-    float perc_move;                // percentage the frequency will move to min/max consonance: 0 means basher is off
-    void *amp_out;                  // output for amplitudes (right now it is just a pass through)
-    void *bash_out;                 // output for bashed frequencies
-} t_basher_cb;
+    float perc_move;                // percentage the frequency will move to min/max consonance: 0 means whacker is off
+    void *amp_out;                  // output for whacked amplitudes
+    void *freq_out;                 // output for frequencies (pass through)
+} t_whacker_cb;
 
 t_symbol *ps_list; // needed for list output? based on thresh.c example in max-sdk
 
 // TODO: look up, why do these have to be doubles and not floats???
-void set_perc_move(t_basher_cb *x, double p) {
+void set_perc_move(t_whacker_cb *x, double p) {
     if (p < 0. || p > 1.){
         object_error((t_object *)x, "received %f: perc_move must be 0. <= p <= 1.; ignoring argument", p);
         return;
@@ -121,7 +84,7 @@ void set_perc_move(t_basher_cb *x, double p) {
 }
 
 // set the threshold min
-void set_min(t_basher_cb *x, double p) {
+void set_min(t_whacker_cb *x, double p) {
     if (p < 0. || p > 1.){
         object_error((t_object *)x, "received %f: min_bw must be 0. <= p <= 1.; ignoring argument", p);
         return;
@@ -133,7 +96,7 @@ void set_min(t_basher_cb *x, double p) {
     x->min_bw = p;
 }
 // set the threshold max
-void set_max(t_basher_cb *x, double p) {
+void set_max(t_whacker_cb *x, double p) {
     if (p < 0. || p > 1.){
         object_error((t_object *)x, "received %f: max_bw must be 0. <= p <= 1.; ignoring argument", p);
         return;
@@ -145,13 +108,12 @@ void set_max(t_basher_cb *x, double p) {
     x->max_bw = p;
 }
 
-// set the bash amt
-void set_diss(t_basher_cb *x, double d) {
+void set_diss(t_whacker_cb *x, double d) {
     x->diss = d > 0 ? 1 : 0;
 }
 
-// set the freqs
-void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
+// set the amps
+void whack_amps(t_whacker_cb *x, t_symbol *s, long argc, t_atom *argv) {
     // argv contains (f1, f2, f3....f_n, a1, a2, a3....a_n)
     long limit = argc/2 < MAXFREQS ? argc/2 : MAXFREQS;
 
@@ -161,7 +123,7 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
         int ind = 2*i;
         x->workspace[i].frequency = atom_getfloat(argv+ind);
         x->workspace[i].amplitude = atom_getfloat(argv+ind+1);
-        x->workspace[i].bashed = 0;
+        x->workspace[i].whacked = 0;
         x->workspace[i].osc_index = i;
     }
 
@@ -184,7 +146,7 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
             for (int j = i+1; j < limit; j++) {
                 const float f_i = x->workspace[i].frequency;
                 const float f_j = x->workspace[j].frequency;
-                if (x->workspace[j].bashed) {continue;}
+                if (x->workspace[j].whacked) {continue;}
                 float cb = get_cb(f_i, f_j);
                 float perc_bw = (f_j - f_i) / cb;
                 if (perc_bw < x-> min_bw) {continue;}
@@ -210,7 +172,7 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
             const float old_freq = x->workspace[change_index].frequency;
             float new_freq = get_new_freq(x->workspace[stable_index].frequency, x->workspace[change_index].frequency, x->min_bw, x->max_bw, x->diss == 0);
             x->workspace[change_index].frequency = old_freq + x->perc_move * (new_freq - old_freq);
-            x->workspace[change_index].bashed = 1;
+            x->workspace[change_index].whacked = 1;
         // or stop searching
         } else {
             search = 0;
@@ -222,25 +184,32 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
     // NEW IMPLEMENTATION
     for (int i = 0; i < limit-1; i++) {
         for (int j = i+1; j < limit; j++) {
-            float f_i = x->workspace[i].frequency;
-            float f_j = x->workspace[j].frequency;
-            if (x->workspace[j].bashed) {continue;}
-            /*
+            const float f_i = x->workspace[i].frequency;
+            const float f_j = x->workspace[j].frequency;
+            if (x->workspace[j].whacked) {continue;}
             float cb = get_cb(f_i, f_j);
             float perc_bw = (f_j - f_i) / cb;
-            */
-            float perc_bw = hz_to_bark(f_j) - hz_to_bark(f_i);
             if (perc_bw < x-> min_bw) {continue;}
             // break loop early
             if (perc_bw > x->max_bw) {break;}
             int i_louder = x->workspace[i].amplitude > x->workspace[j].amplitude; // bool
-            int stable_index = i_louder ? i : j;
-            int change_index = i_louder? j : i;
-            float old_freq = x->workspace[change_index].frequency;
-            float new_freq = get_new_freq(x->workspace[stable_index].frequency, x->workspace[change_index].frequency, x->min_bw, x->max_bw, x->diss == 0);
-            x->workspace[change_index].frequency = old_freq + x->perc_move * (new_freq - old_freq);
-            x->workspace[change_index].bashed = 1;
-            if (change_index == i) {break;}
+            int louder_index = i_louder ? i : j;
+            int quiet_index = i_louder? j : i;
+            float loud_power = powf(x->workspace[louder_index].amplitude, 2);
+            float quiet_power = powf(x->workspace[quiet_index].amplitude, 2);
+            if (x->diss == 0) {
+                float pow_diff = loud_power * x->perc_move;
+                x->workspace[louder_index].amplitude = sqrtf(loud_power + pow_diff);
+                x->workspace[quiet_index].amplitude = sqrtf(quiet_power - pow_diff);
+                x->workspace[quiet_index].whacked = 1;
+                if (quiet_index == i) {break;}
+            } else {
+                float pow_diff = (loud_power - quiet_power)*0.5*x->perc_move;
+                x->workspace[louder_index].amplitude = sqrtf(loud_power - pow_diff);
+                x->workspace[quiet_index].amplitude = sqrtf(quiet_power + pow_diff);
+                x->workspace[louder_index].whacked = 1;
+                if (louder_index == i) {break;}
+            }
         }
     }
     // output lists regardless of bashing
@@ -251,13 +220,13 @@ void bash_freqs(t_basher_cb *x, t_symbol *s, long argc, t_atom *argv) {
     }
 
     outlet_list(x->amp_out, ps_list, limit, x->output_a);
-    outlet_list(x->bash_out, ps_list, limit, x->output_f);
+    outlet_list(x->freq_out, ps_list, limit, x->output_f);
 }
 
 // constructor
-static void *basher_cb_new(t_symbol *s, int argc, t_atom *argv)
+static void *whacker_cb_new(t_symbol *s, int argc, t_atom *argv)
 {
-    t_basher_cb *x = (t_basher_cb *)object_alloc(basher_cb_class); // create new instance
+    t_whacker_cb *x = (t_whacker_cb *)object_alloc(whacker_cb_class); // create new instance
 
     floatin(x,4);   // toggle
     floatin(x,3);   // perc_move
@@ -268,7 +237,7 @@ static void *basher_cb_new(t_symbol *s, int argc, t_atom *argv)
     memset(x->workspace, 0, mem_size);
 
     x->amp_out = listout((t_object *)x); // add outlet
-    x->bash_out = listout((t_object *)x); // add outlet
+    x->freq_out = listout((t_object *)x); // add outlet
 
     // defaults
     x->min_bw = .1;
@@ -303,19 +272,19 @@ static void *basher_cb_new(t_symbol *s, int argc, t_atom *argv)
 void ext_main(void* r)
 {
     ps_list = gensym("list");
-    basher_cb_class = class_new(
-            "basher_cb", // class name
-            (method)basher_cb_new, // constructor
+    whacker_cb_class = class_new(
+            "whacker_cb", // class name
+            (method)whacker_cb_new, // constructor
             (method)NULL, // destructor
-    	    sizeof(t_basher_cb), // class size in bytes
+    	    sizeof(t_whacker_cb), // class size in bytes
             0L, // graphical representation, depr
             A_GIMME, // params
             0 // default value
     );
-    class_addmethod(basher_cb_class, (method)bash_freqs, "list", A_GIMME, 0);
-    class_addmethod(basher_cb_class, (method)set_min, "ft1", A_FLOAT, 0);
-    class_addmethod(basher_cb_class, (method)set_max, "ft2", A_FLOAT, 0);
-    class_addmethod(basher_cb_class, (method)set_perc_move, "ft3", A_FLOAT, 0);
-    class_addmethod(basher_cb_class, (method)set_diss, "ft4", A_FLOAT, 0);
-    class_register(CLASS_BOX, basher_cb_class);
+    class_addmethod(whacker_cb_class, (method)whack_amps, "list", A_GIMME, 0);
+    class_addmethod(whacker_cb_class, (method)set_min, "ft1", A_FLOAT, 0);
+    class_addmethod(whacker_cb_class, (method)set_max, "ft2", A_FLOAT, 0);
+    class_addmethod(whacker_cb_class, (method)set_perc_move, "ft3", A_FLOAT, 0);
+    class_addmethod(whacker_cb_class, (method)set_diss, "ft4", A_FLOAT, 0);
+    class_register(CLASS_BOX, whacker_cb_class);
 }
