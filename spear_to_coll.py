@@ -1,3 +1,10 @@
+# NOTE: for this code to work, the spear analyses need to be exported as
+# "Text - Resampled Frames" under File > Export Format in SPEAR.
+# Also note: to avoid having way too many partials, remove some from the analysis.
+# I typically use the following process:
+# * Edit > Select Partials Below Threshold -50 dB > Delete
+# * Edit > Select Partials Below Duration 0.1 seconds > Delete
+
 import numpy as np
 import sys
 
